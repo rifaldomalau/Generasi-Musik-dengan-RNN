@@ -24,11 +24,14 @@ def load_resources():
 vocab, char2idx, idx2char = load_resources()
 
 def build_model(vocab_size, embedding_dim, rnn_units, batch_size):
-    return tf.keras.Sequential([
-        tf.keras.layers.Embedding(vocab_size, embedding_dim, batch_input_shape=[batch_size, None]),
+    model = tf.keras.Sequential([
+        # Gunakan InputLayer untuk mendefinisikan batch_size dan shape
+        tf.keras.layers.InputLayer(batch_shape=[batch_size, None]),
+        tf.keras.layers.Embedding(vocab_size, embedding_dim),
         tf.keras.layers.LSTM(rnn_units, return_sequences=True, recurrent_initializer='glorot_uniform', stateful=True),
         tf.keras.layers.Dense(vocab_size)
     ])
+    return model
 
 @st.cache_resource
 def get_model():
