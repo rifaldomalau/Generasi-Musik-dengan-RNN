@@ -52,16 +52,28 @@ def generate_music_text(model, start_string, length, temp):
     input_eval = tf.expand_dims(input_eval, 0)
     text_generated = []
     
-    # Perbaikan: Coba reset_states, jika gagal gunakan reset_state (Keras 3)
+    # --- PERBAIKAN STATE RESET (Anti-Error) ---
     if hasattr(model, 'reset_states'):
         model.reset_states()
-    else:
+    elif hasattr(model, 'reset_state'):
         model.reset_state()
+    else:
+        # Jika keduanya tidak ada (jarang terjadi), kita buat state manual
+        for layer in model.layers:
+            if hasattr(layer, 'reset_states'):
+                layer.reset_states()
+    # ------------------------------------------
 
     for i in range(length):
         predictions = model(input_eval)
-        predictions = tf.squeeze(predictions, 0) / temp
-        predicted_id = tf.random.categorical(predictions, num_samples=1)[-1,0].numpy()
+        # Hapus dimensi batch
+        predictions = tf.squeeze(predictions, 0)
+        
+        # Gunakan temperature untuk prediksi
+        predictions = predictions / temp
+        predicted_id = tf.random.categorical(predictions, num_samples=1)[-1, 0].numpy()
+        
+        # Masukkan hasil prediksi sebagai input berikutnya
         input_eval = tf.expand_dims([predicted_id], 0)
         text_generated.append(idx2char[predicted_id])
 
