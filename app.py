@@ -3,17 +3,14 @@ import tensorflow as tf
 import numpy as np
 import os
 import mitdeeplearning as mdl
-from music21 import converter
 import urllib.parse
 
-# --- 1. KONFIGURASI INTERNAL ---
+# --- 1. KONFIGURASI ---
 os.environ["COMET_API_KEY"] = "JPM33OpbFxafASglpKXm1giB7"
-
 st.set_page_config(page_title="AI Music Composer", page_icon="🎼", layout="wide")
 
 @st.cache_resource
 def load_resources():
-    # MEMUAT DATASET ASLI UNTUK MEMBENTUK VOCAB
     songs = mdl.lab1.load_training_data()
     all_songs_concat = "\n\n".join(songs)
     vocab = sorted(set(all_songs_concat))
@@ -23,12 +20,13 @@ def load_resources():
 
 vocab, char2idx, idx2char = load_resources()
 
+# --- 2. MODEL (Update Keras 3 Compatibility) ---
 def build_model(vocab_size, embedding_dim, rnn_units, batch_size):
     model = tf.keras.Sequential([
-        # Gunakan InputLayer untuk mendefinisikan batch_size dan shape
+        # Menggunakan InputLayer agar batch_size terdefinisi dengan jelas
         tf.keras.layers.InputLayer(batch_shape=[batch_size, None]),
         tf.keras.layers.Embedding(vocab_size, embedding_dim),
-        tf.keras.layers.LSTM(rnn_units, return_sequences=True, recurrent_initializer='glorot_uniform', stateful=True),
+        tf.keras.layers.LSTM(rnn_units, return_sequences=True, stateful=True, recurrent_initializer='glorot_uniform'),
         tf.keras.layers.Dense(vocab_size)
     ])
     return model
@@ -36,33 +34,29 @@ def build_model(vocab_size, embedding_dim, rnn_units, batch_size):
 @st.cache_resource
 def get_model():
     vocab_size = len(vocab)
-    embedding_dim = 256
-    rnn_units = 1024
+    model = build_model(vocab_size, embedding_dim=256, rnn_units=1024, batch_size=1)
     
-    model = build_model(vocab_size, embedding_dim, rnn_units, batch_size=1)
-    
-    # Path file bobot - PASTIKAN NAMA INI BENAR
-    checkpoint_path = 'my_ckpt.weights.h5' 
-    
+    checkpoint_path = 'my_ckpt.weights.h5'
     if os.path.exists(checkpoint_path):
         try:
-            # Langkah Krusial: Build model dengan input shape sebelum load
-            model.build(tf.TensorShape([1, None])) 
-            # Load weights dengan skip_mismatch jika ada sedikit perbedaan versi
             model.load_weights(checkpoint_path)
             return model, True
         except Exception as e:
-            # Cetak error ke terminal agar kita bisa diagnosa
-            print(f"DEBUG ERROR: {e}")
+            print(f"Error: {e}")
             return model, False
     return None, False
 
-# --- FUNGSI GENERASI ---
+# --- 3. GENERASI TEKS (Perbaikan reset_states) ---
 def generate_music_text(model, start_string, length, temp):
     input_eval = [char2idx[s] for s in start_string]
     input_eval = tf.expand_dims(input_eval, 0)
     text_generated = []
-    model.reset_states()
+    
+    # Perbaikan: Coba reset_states, jika gagal gunakan reset_state (Keras 3)
+    if hasattr(model, 'reset_states'):
+        model.reset_states()
+    else:
+        model.reset_state()
 
     for i in range(length):
         predictions = model(input_eval)
@@ -73,43 +67,33 @@ def generate_music_text(model, start_string, length, temp):
 
     return (start_string + ''.join(text_generated))
 
-# --- UI UTAMA ---
-st.title("🎼 AI Music Generator (RNN)")
-
+# --- 4. UI ---
+st.title("🎹 AI Music Generator")
 col1, col2 = st.columns([1, 2])
 
 with col1:
-    st.header("Konfigurasi")
-    seed = st.text_input("Seed Text", "X:1") # Gunakan X:1 sebagai standar ABC
+    seed = st.text_input("Seed Text", "X:1")
     gen_length = st.slider("Panjang Karakter", 100, 1000, 500)
-    temp = st.slider("Kreativitas", 0.1, 1.5, 0.8) # 0.8 biasanya lebih stabil
-    generate_btn = st.button("🎹 Gubah Musik")
+    temp = st.slider("Kreativitas", 0.1, 1.5, 0.8)
+    generate_btn = st.button("🎼 Gubah Musik")
 
 if generate_btn:
-    with st.spinner("Sedang memproses nada..."):
+    with st.spinner("Menggubah nada..."):
         model, is_loaded = get_model()
         
         if model is None:
-            st.error(f"❌ File '{checkpoint_path}' tidak ditemukan!")
-            st.stop()
-        elif not is_loaded:
-            st.warning("⚠️ Gagal memuat bobot (Weights Mismatch). Menampilkan hasil acak.")
-        
-        abc_output = generate_music_text(model, seed, gen_length, temp)
-        
-        # --- BAGIAN DI DALAM if generate_btn: ---
-        with col2:
-            st.subheader("📝 Hasil Notasi ABC")
-            st.code(abc_output, language="text")
+            st.error("File weights tidak ditemukan!")
+        else:
+            if not is_loaded:
+                st.warning("Bobot gagal dimuat, menggunakan nada acak.")
             
-            # Langsung gunakan Online Player agar tidak error di server
-            st.subheader("🎵 Interactive Player")
-            import urllib.parse
-            encoded_abc = urllib.parse.quote(abc_output)
-            # Menggunakan player eksternal yang stabil
-            player_url = f"https://abcjs.net/abcjs-editor.html?abc={encoded_abc}"
+            abc_output = generate_music_text(model, seed, gen_length, temp)
             
-            st.markdown(f"""
-                <iframe src="{player_url}" width="100%" height="500px" 
-                style="border: 2px solid #4CAF50; border-radius: 10px;"></iframe>
-            """, unsafe_allow_html=True)
+            with col2:
+                st.subheader("📝 Hasil Notasi ABC")
+                st.code(abc_output, language="text")
+                
+                # Player Online (Paling Aman untuk Cloud)
+                encoded_abc = urllib.parse.quote(abc_output)
+                player_url = f"https://abcjs.net/abcjs-editor.html?abc={encoded_abc}"
+                st.markdown(f'<iframe src="{player_url}" width="100%" height="500px" style="border-radius:10px;"></iframe>', unsafe_allow_html=True)
