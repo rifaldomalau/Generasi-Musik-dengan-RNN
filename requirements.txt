@@ -5,3 +5,4 @@ music21
 matplotlib
 ipython
 numpy
+opencv-python-headless
