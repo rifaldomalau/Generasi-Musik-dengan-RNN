@@ -1,0 +1,5 @@
+streamlit
+tensorflow
+mitdeeplearning
+comet_ml
+numpy
