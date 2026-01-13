@@ -3,4 +3,5 @@ tensorflow
 mitdeeplearning
 music21
 matplotlib
+ipython
 numpy

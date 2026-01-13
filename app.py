@@ -94,11 +94,19 @@ if generate_btn:
         
         abc_output = generate_music_text(model, seed, gen_length, temp)
         
+        # --- BAGIAN DI DALAM if generate_btn: ---
         with col2:
             st.subheader("📝 Hasil Notasi ABC")
             st.code(abc_output, language="text")
-
-            # Online Player (Paling Stabil)
+            
+            # Langsung gunakan Online Player agar tidak error di server
+            st.subheader("🎵 Interactive Player")
+            import urllib.parse
             encoded_abc = urllib.parse.quote(abc_output)
+            # Menggunakan player eksternal yang stabil
             player_url = f"https://abcjs.net/abcjs-editor.html?abc={encoded_abc}"
-            st.markdown(f'<iframe src="{player_url}" width="100%" height="400px"></iframe>', unsafe_allow_html=True)
+            
+            st.markdown(f"""
+                <iframe src="{player_url}" width="100%" height="500px" 
+                style="border: 2px solid #4CAF50; border-radius: 10px;"></iframe>
+            """, unsafe_allow_html=True)
