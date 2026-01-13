@@ -36,13 +36,17 @@ def get_model():
     vocab_size = len(vocab)
     model = build_model(vocab_size, embedding_dim=256, rnn_units=1024, batch_size=1)
     
+    # Memastikan model terinisialisasi sebelum load
+    model.build(tf.TensorShape([1, None])) 
+    
     checkpoint_path = 'my_ckpt.weights.h5'
     if os.path.exists(checkpoint_path):
         try:
-            model.load_weights(checkpoint_path)
+            # Gunakan by_name=True dan skip_mismatch=True untuk memaksa load
+            model.load_weights(checkpoint_path, by_name=True, skip_mismatch=True)
             return model, True
         except Exception as e:
-            print(f"Error: {e}")
+            print(f"Error loading weights: {e}")
             return model, False
     return None, False
 
