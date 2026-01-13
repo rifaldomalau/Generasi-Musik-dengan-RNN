@@ -1,5 +1,6 @@
 streamlit
 tensorflow
 mitdeeplearning
-comet_ml
+music21
+matplotlib
 numpy
